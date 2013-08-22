@@ -67,6 +67,3 @@
 [submodule "_vim/bundle/command-t"]
 	path = _vim/bundle/command-t
 	url = https://github.com/wincent/Command-T.git
-[submodule "_vim/bundle/jedi"]
-	path = _vim/bundle/jedi
-	url = https://github.com/romank0/jedi-vim.git
