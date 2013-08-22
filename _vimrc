@@ -66,6 +66,17 @@ endfu
 
 nmap <leader>sb :call SplitScroll()<CR>
 
+" Omnicomplete as Ctrl+Space
+inoremap <Nul> <C-x><C-o>
+" toggle paste mode
+nmap <LocalLeader>pp :set paste!<cr>
+" If I forgot to sudo vim a file, do that with :w!!
+cmap w!! %!sudo tee > /dev/null %
+" When I forget I'm in Insert mode, how often do you type 'jj' anyway?:
+imap jj <Esc>
+" correct type-o's on exit
+nmap q: :q
+
 
 "<CR><C-w>l<C-f>:set scrollbind<CR>
 
@@ -109,17 +120,21 @@ map <c-h> <c-w>h
 "  happen as if in command mode )
 imap <C-W> <C-O><C-W>
 
-" Open NerdTree
-map <leader>n :NERDTreeToggle<CR>
+let NERDTreeWinPos="left"
+let NERDTreeWinSize=35
 
-map <leader>f :CtrlP<CR>
-map <leader>b :CtrlPBuffer<CR>
+" Open NerdTree
+map <leader>nt :NERDTreeToggle<CR>
+
+"map <leader>f :CtrlP<CR>
+"map <leader>b :CtrlPBuffer<CR>
+
 
 " Ack searching
 nmap <leader>a <Esc>:Ack!
 
 " Load the Gundo window
-map <leader>g :GundoToggle<CR>
+map <leader>u :GundoToggle<CR>
 
 " Jump to the definition of whatever the cursor is on
 map <leader>j :RopeGotoDefinition<CR>
@@ -174,6 +189,7 @@ set pumheight=6             " Keep a small completion window
 
 """ Moving Around/Editing
 set cursorline              " have a line indicate the cursor location
+set cursorcolumn              " show the cursor column
 set ruler                   " show the cursor position all the time
 set nostartofline           " Avoid moving cursor to BOL when jumping around
 set virtualedit=block       " Let cursor move past the last char in <C-v> mode
@@ -192,6 +208,7 @@ set shiftround              " rounds indent to a multiple of shiftwidth
 set matchpairs+=<:>         " show matching <> (html mainly) as well
 set foldmethod=indent       " allow us to fold on indents
 set foldlevel=99            " don't fold by default
+set matchpairs+=<:>           " add < and > to match pairs
 
 " don't outdent hashes
 inoremap # #
@@ -217,7 +234,15 @@ set report=0                " : commands always print changed line count.
 set shortmess+=a            " Use [+]/[RO]/[w] for modified/readonly/written.
 set ruler                   " Show some info, even without statuslines.
 set laststatus=2            " Always show statusline, even if only 1 window.
-set statusline=[%l,%v\ %P%M]\ %f\ %r%h%w\ (%{&ff})\ %{fugitive#statusline()}
+let &stl="%F%m%r%h%w\ [%{&ff}]\ [%Y]\ %P\ %=%{fugitive#statusline()}\ [a=\%03.3b]\ [h=\%02.2B]\ [%l,%v]"
+
+" ---------------------------------------------------------------------------
+"  backup options
+set backup
+set backupdir=~/.backup
+set viminfo=%100,'100,/100,h,\"500,:100,n~/.viminfo
+set history=200
+"set viminfo='100,f1
 
 " displays tabs with :set list & displays when a line runs off-screen
 set listchars=tab:>-,eol:$,trail:-,precedes:<,extends:>
@@ -229,6 +254,7 @@ set smartcase               " unless uppercase letters are used in the regex.
 set smarttab                " Handle tabs more intelligently 
 set hlsearch                " Highlight searches by default.
 set incsearch               " Incrementally search while typing a /regex
+set diffopt=filler,iwhite   " ignore all whitespace and sync
 
 """" Display
 if has("gui_running")
@@ -276,7 +302,7 @@ autocmd FileType html,xhtml,xml,css setlocal expandtab shiftwidth=2 tabstop=2 so
 
 " Python
 "au BufRead *.py compiler nose
-au FileType python set omnifunc=pythoncomplete#Complete
+"au FileType python set omnifunc=pythoncomplete#Complete
 au FileType python setlocal expandtab shiftwidth=4 tabstop=8 softtabstop=4 smartindent cinwords=if,elif,else,for,while,try,except,finally,def,class,with
 au FileType coffee setlocal expandtab shiftwidth=4 tabstop=8 softtabstop=4 smartindent cinwords=if,elif,else,for,while,try,except,finally,def,class,with
 au BufRead *.py set efm=%C\ %.%#,%A\ \ File\ \"%f\"\\,\ line\ %l%.%#,%Z%[%^\ ]%\\@=%m
@@ -305,5 +331,66 @@ if filereadable($VIRTUAL_ENV . '/.vimrc')
 endif
 
 if exists("&colorcolumn")
-   set colorcolumn=79
+    au FileType python set colorcolumn=81
+    au FileType java set colorcolumn=121
+endif
+
+" jump to last line edited in a given file (based on .viminfo)
+autocmd BufReadPost *
+                \ if line("'\"") > 0|
+                \       if line("'\"") <= line("$")|
+                \               exe("norm '\"")|
+                \       else|
+                \               exe "norm $"|
+                \       endif|
+                \ endif
+
+" improve legibility
+au BufRead quickfix setlocal nobuflisted wrap number
+
+" improved formatting for markdown
+" http://plasticboy.com/markdown-vim-mode/
+autocmd BufRead *.mkd  set ai formatoptions=tcroqn2 comments=n:>
+
+
+function! s:ExecuteInShell(command)
+  let command = join(map(split(a:command), 'expand(v:val)'))
+  let winnr = bufwinnr('^' . command . '$')
+  silent! execute  winnr < 0 ? 'botright new ' . fnameescape(command) : winnr . 'wincmd w'
+  setlocal buftype=nowrite bufhidden=wipe nobuflisted noswapfile nowrap number
+  echo 'Execute ' . command . '...'
+  silent! execute 'silent %!'. command
+  silent! execute 'resize ' . line('$')
+  silent! redraw
+  silent! execute 'au BufUnload <buffer> execute bufwinnr(' . bufnr('#') . ') . ''wincmd w'''
+  silent! execute 'nnoremap <silent> <buffer> <LocalLeader>r :call <SID>ExecuteInShell(''' . command . ''')<CR>'
+  echo 'Shell command ' . command . ' executed.'
+endfunction
+command! -complete=shellcmd -nargs=+ Shell call s:ExecuteInShell(<q-args>)
+
+if !has("gui_running")
+      "colorscheme candycode   " yum candy
+
+      " I pretty much only like this scheme if I can use SIMBL with terminal
+      " colors:
+      " (http://www.culater.net/software/TerminalColors/TerminalColors.php)
+      " to change the really hard-to-read dark blue into a lighter shade.
+      " Or; Use iterm with Tango colors
+      colorscheme mustang
+      "colorscheme rdark
+      "colorscheme ir_black_new
+endif
+
+" ---------------------------------------------------------------------------
+" setup for the visual environment
+if $TERM =~ '^xterm'
+      set t_Co=256 
+elseif $TERM =~ '^screen-bce'
+      set t_Co=256            " just guessing
+elseif $TERM =~ '^rxvt'
+      set t_Co=88
+elseif $TERM =~ '^linux'
+      set t_Co=8
+else
+      set t_Co=16
 endif
